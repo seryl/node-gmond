@@ -1,7 +1,6 @@
 Logger = require './logger'
 CLI = require './cli'
 Config = require './config'
-{Identity, generate_identity} = require './identity'
 WebServer = require './webserver'
 
 ###*
