@@ -1,6 +1,7 @@
 Logger = require './logger'
 CLI = require './cli'
 Config = require './config'
+Gmond = require './gmond'
 WebServer = require './webserver'
 
 ###*
@@ -11,6 +12,7 @@ class Application
     @config = Config.get()
     @logger = Logger.get()
     @cli = new CLI()
+    @gmond = new Gmond()
     @ws = new WebServer()
 
   ###*

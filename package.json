@@ -15,6 +15,7 @@
     "express":"3.0.x",
     "async": "0.1.x",
     "gmetric": "0.2.x",
+    "xmlbuilder": "0.4.x",
     "pkginfo": "0.2.x"
   },
   "devDependencies": {
