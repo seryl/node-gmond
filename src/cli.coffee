@@ -20,14 +20,19 @@ class CLI
       .default('c', "/etc/node-gmond.json")
 
       # ganglia gmetric gmond host
-      .alias('g', 'gmetric')
-      .describe('g', 'The gmond host to send gmetric data to')
+      .alias('g', 'listen_address')
+      .describe('g', 'The gmond address to listen on')
       .default('g', '127.0.0.1')
 
       # ganglia gmetric gmond port
-      .alias('P', 'gPort')
-      .describe('P', 'The gmond port to send gmetric data to')
-      .default('P', 8649)
+      .alias('T', 'gmond_tcp_port')
+      .describe('T', 'The gmond TCP port to listen on')
+      .default('T', 8649)
+
+      # ganglia gmetric gmond TCP port
+      .alias('U', 'gmond_udp_port')
+      .describe('U', 'The gmond UDP port to listen on (for XML requests)')
+      .default('U', 8649)
 
       # logging
       .alias('l', 'loglevel')

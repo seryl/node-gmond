@@ -18,13 +18,18 @@ class Gmond
     # start_udp_service()
     @start_xml_service()
 
-    @clusters = {
-      "analytics"
-    }
+    @clusters =
+      analytics:
+        owner: null
+        latlong: null
+        url: null
+        hosts: new Object()
 
-    root = @get_gmond_xml_root()
+    console.log @clusters
 
-    console.log root.end({ pretty: true, indent: '  ', newline: "\n" })
+    # root = @get_gmond_xml_root()
+
+    # console.log root.end({ pretty: true, indent: '  ', newline: "\n" })
 
   ###*
    * Starts up the xml service.
@@ -32,19 +37,48 @@ class Gmond
   start_xml_service: =>
     @logger.info 'Starting xml service'
     server = net.createServer (sock) =>
-      # srv_msg = "XML Server Started: #{sock.remoteAddress}:#{sock.remotePort}"
-      # @logger.info srv_msg
-      sock.end("done done done")
+      sock.end(@generate_xml_snapshot())
+    server.listen(@config.get('gmond_tcp_port'), @config.get('listen_address'))
 
-      sock.on 'data', (data) =>
-        @logger.info "Received TCP Data: #{data}"
+  ###*
+   * Adds a new metric automatically determining the cluster or using defaults.
+  ###
+  add_metric: (metric) =>
+    hmet = hashify_metric(metric)
+    cluster = @determine_cluster_from_metric(hmet)
+    @clusters[hmet.cluster] ||= new Object()
 
-      sock.on 'close', (data) =>
-        @logger.info "Closing TCP Socket"
+  determine_cluster_from_metric: (metric) =>
+    return "analytics"
 
-    server.listen(8649, "127.0.0.1")
+  hashify_metric: (metric) ->
+    hmet = new Object()
+    return
 
+  ###*
+   * Generates an xml snapshot of the gmond state.
+  ###
+  generate_xml_snapshot: =>
+    root = @get_gmond_xml_root()
+    for cluster in Object.keys(@clusters)
+      generate_cluster_xml(root, cluster)
 
+  ###*
+   * Appends the cluster_xml for a single cluster to the 
+  ###
+  generate_cluster_xml: (root, cluster) =>
+    if Object.keys(@clusters[cluster]['hosts']) == 0
+      delete_cluster(cluster)
+    c_ele = root.ele('CLUSTER')
+    c_ele.att('NAME', @clusters[cluster]['name'])
+    c_ele.att('LOCALTIME', new Date().getTime())
+    c_ele.att('LATLONG', @clusters[cluster]['latlong'] || "unspecified")
+    c_ele.att('URL', @clusters[cluster]['url'] || "127.0.0.1")
+
+  ###*
+   * Returns the gmond_xml root node to build upon.
+   * @return {Object} The root gmond xmlbuilder
+  ###
   get_gmond_xml_root: ->
     root = builder.create 'GANGLIA_XML', { version: '1.0', 'encoding': 'ISO-8859-1', standalone: 'yes' }, 'ext': """[
   <!ELEMENT GANGLIA_XML (GRID|CLUSTER|HOST)*>
@@ -96,8 +130,8 @@ class Gmond
     <!ATTLIST METRICS UNITS CDATA #IMPLIED>
     <!ATTLIST METRICS SLOPE (zero | positive | negative | both | unspecified) #IMPLIED>
     <!ATTLIST METRICS SOURCE (gmond) 'gmond'>
+  <GANGLIA_XML VERSION="3.3.0" SOURCE="gmond">
 ]"""
     return root
-
 
 module.exports = Gmond
