@@ -75,12 +75,18 @@ class Gmond
     c_ele.att('LATLONG', @clusters[cluster]['latlong'] || "unspecified")
     c_ele.att('URL', @clusters[cluster]['url'] || "127.0.0.1")
 
+  generate_metric: ->
+
+  generate_extra_element: ->
+
   ###*
    * Returns the gmond_xml root node to build upon.
    * @return {Object} The root gmond xmlbuilder
   ###
   get_gmond_xml_root: ->
-    root = builder.create 'GANGLIA_XML', { version: '1.0', 'encoding': 'ISO-8859-1', standalone: 'yes' }, 'ext': """[
+    root = builder.create 'GANGLIA_XML'
+    , { version: '1.0', encoding: 'ISO-8859-1'
+    , standalone: 'yes' }, ext: """[
   <!ELEMENT GANGLIA_XML (GRID|CLUSTER|HOST)*>
     <!ATTLIST GANGLIA_XML VERSION CDATA #REQUIRED>
     <!ATTLIST GANGLIA_XML SOURCE CDATA #REQUIRED>
@@ -107,7 +113,7 @@ class Gmond
   <!ELEMENT METRIC (EXTRA_DATA*)>
     <!ATTLIST METRIC NAME CDATA #REQUIRED>
     <!ATTLIST METRIC VAL CDATA #REQUIRED>
-    <!ATTLIST METRIC TYPE (string | int8 | uint8 | int16 | uint16 | int32 | uint32 | float | double | timestamp) #REQUIRED>
+    <!ATTLIST METRIC TYPE (string | int8 | uint8 | int16 | uint16 | int32 | uint32 | int64 | uint64 | float | double | timestamp) #REQUIRED>
     <!ATTLIST METRIC UNITS CDATA #IMPLIED>
     <!ATTLIST METRIC TN CDATA #IMPLIED>
     <!ATTLIST METRIC TMAX CDATA #IMPLIED>
@@ -126,12 +132,13 @@ class Gmond
     <!ATTLIST METRICS NAME CDATA #REQUIRED>
     <!ATTLIST METRICS SUM CDATA #REQUIRED>
     <!ATTLIST METRICS NUM CDATA #REQUIRED>
-    <!ATTLIST METRICS TYPE (string | int8 | uint8 | int16 | uint16 | int32 | uint32 | float | double | timestamp) #REQUIRED>
+    <!ATTLIST METRICS TYPE (string | int8 | uint8 | int16 | uint16 | int32 | uint32 | int64 | uint64 | float | double | timestamp) #REQUIRED>
     <!ATTLIST METRICS UNITS CDATA #IMPLIED>
     <!ATTLIST METRICS SLOPE (zero | positive | negative | both | unspecified) #IMPLIED>
     <!ATTLIST METRICS SOURCE (gmond) 'gmond'>
   <GANGLIA_XML VERSION="3.3.0" SOURCE="gmond">
 ]"""
     return root
+
 
 module.exports = Gmond
