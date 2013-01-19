@@ -15,21 +15,13 @@ class Gmond
   constructor: ->
     @config = Config.get()
     @logger = Logger.get()
+    @gmetric = new Gmetric()
+    @gmond_started = unix_time()
+
     # start_udp_service()
     @start_xml_service()
 
-    @clusters =
-      analytics:
-        owner: null
-        latlong: null
-        url: null
-        hosts: new Object()
-
-    console.log @clusters
-
-    # root = @get_gmond_xml_root()
-
-    # console.log root.end({ pretty: true, indent: '  ', newline: "\n" })
+    @clusters = new Object()
 
   ###*
    * Starts up the xml service.
@@ -41,9 +33,17 @@ class Gmond
     server.listen(@config.get('gmond_tcp_port'), @config.get('listen_address'))
 
   ###*
+   * Returns the current unix timestamp.
+  ###
+  unix_time: ->
+    new Date().getTime()
+
+  ###*
    * Adds a new metric automatically determining the cluster or using defaults.
+   * @param {Object} (metric)
   ###
   add_metric: (metric) =>
+    hmet = @gmetric.parse
     hmet = hashify_metric(metric)
     cluster = @determine_cluster_from_metric(hmet)
     @clusters[hmet.cluster] ||= new Object()
@@ -51,8 +51,11 @@ class Gmond
   determine_cluster_from_metric: (metric) =>
     return "analytics"
 
-  hashify_metric: (metric) ->
-    hmet = new Object()
+  ###*
+   * Generates a hashmap reference of a gmetric object.
+  ###
+  hashify_metric: (metric) =>
+    hmet = @gmetric.
     return
 
   ###*
@@ -61,23 +64,81 @@ class Gmond
   generate_xml_snapshot: =>
     root = @get_gmond_xml_root()
     for cluster in Object.keys(@clusters)
-      generate_cluster_xml(root, cluster)
+      root = generate_cluster_element(root, cluster)
+    return root.end({ pretty: true, indent: '  ', newline: "\n" })
 
   ###*
    * Appends the cluster_xml for a single cluster to the 
   ###
-  generate_cluster_xml: (root, cluster) =>
-    if Object.keys(@clusters[cluster]['hosts']) == 0
+  generate_cluster_element: (root, cluster) =>
+    if Object.keys(@clusters[cluster].hosts).length == 0
       delete_cluster(cluster)
-    c_ele = root.ele('CLUSTER')
-    c_ele.att('NAME', @clusters[cluster]['name'])
-    c_ele.att('LOCALTIME', new Date().getTime())
-    c_ele.att('LATLONG', @clusters[cluster]['latlong'] || "unspecified")
-    c_ele.att('URL', @clusters[cluster]['url'] || "127.0.0.1")
+    ce = root.ele('CLUSTER')
+    ce.att('NAME', @clusters[cluster].name || @config.get('cluster'))
+    ce.att('LOCALTIME', new Date().getTime())
+    ce.att('OWNER', @clusters[cluster].owner || @config.get('owner'))
+    ce.att('LATLONG', @clusters[cluster].latlong || @config.get('latlong'))
+    ce.att('URL', @clusters[cluster].url || @config.get('url'))
 
-  generate_metric: ->
+    if @clusters[cluster].hosts == undefined
+      return root
 
-  generate_extra_element: ->
+    hostlist = Object.keys(@clusters[cluster].hosts)
+    if hostlist.length == 0
+      return root
+
+    for h in hostlist
+      ce = generate_host_element(ce, @clusters[cluster]['hosts'][h])
+    return root
+
+  ###*
+   * Generates a host element for a given host and attaches to the parent.
+  ###
+  generate_host_element: (parent, host) ->
+    he = parent.ele('HOST')
+    he.att('NAME', h)
+    he.att('IP', host['ip'])
+    he.att('TAGS', (host['tags'] or []).join(','))
+    he.att('REPORTED', host['reported'])
+    he.att('TN', @unix_time() - host.tmax)
+    he.att('TMAX', host.tmax || @config.get('tmax'))
+    he.att('DMAX', host.dmax || @config.get('dmax'))
+    he.att('LOCATION', host.location || @config.get('latlong'))
+    he.att('GMOND_STARTED', @gmond_started)
+    for m in host.metrics
+      he = generate_metric_element(he, m)
+    return parent
+
+  ###*
+   * Generates the metric element and attaches to the parent.
+  ###
+  generate_metric_element: (parent, metric) ->
+    me = parent.ele('METRIC')
+    me.att('NAME', m.name)
+    me.att('VAL', m.value)
+    me.att('TYPE', m.type)
+    me.att('UNITS', m.units)
+    me.att('TN', @unix_time())
+    me.att('TMAX', m.tmax || @config.get('tmax'))
+    me.att('DMAX', m.dmax || @config.get('dmax'))
+    me.att('SLOPE', m.slope)
+    me = generate_elements(me, metric)
+    return parent
+
+  ###*
+   * Generates the extra elems for a metric and attaches to the parent.
+  ###
+  generate_extra_elements: (parent, metric) ->
+    extras = @gmetric.extra_elements(metric)
+    if extras.length < 1
+      return parent
+
+    ed = parent.ele('EXTRA_DATA')
+    for extra in extras
+      ee = ed.ele('EXTRA_ELEMENT')
+      ee.att('NAME', extra)
+      ee.att('VAL', metric[extra])
+    return parent
 
   ###*
    * Returns the gmond_xml root node to build upon.
@@ -139,6 +200,5 @@ class Gmond
   <GANGLIA_XML VERSION="3.3.0" SOURCE="gmond">
 ]"""
     return root
-
 
 module.exports = Gmond
