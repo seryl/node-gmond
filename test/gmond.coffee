@@ -1,14 +1,19 @@
 dgram = require 'dgram'
 Gmetric = require 'gmetric'
+Gmond = require '../lib/gmond'
 
 describe 'Gmond', ->
   gmetric = new Gmetric()
+  gmond = null
 
   beforeEach (done) ->
+    gmond = new Gmond()
     done()
 
   afterEach (done) ->
-    done()
+    gmond.stop_xml_service () =>
+      gmond = null
+      done()
 
   it "should have a default cluster configuration", (done) =>
     @config.get('dmax').should.equal 3600
@@ -20,9 +25,43 @@ describe 'Gmond', ->
     done()
 
   it "should be able to add a host with proper packet ordering", (done) =>
+    metric =
+      hostname: 'awesomehost.mydomain.com',
+      group: 'testgroup'
+      spoof: true
+      units: 'widgets/sec'
+      slope: 'positive'
+      name: 'bestmetric'
+      value: 10
+      type: 'int32'
+
+    pmetric = gmetric.pack(metric)
+    gmond.add_metric(pmetric.meta)
+    gmond.add_metric(pmetric.data)
+    host = Object.keys(gmond.hosts)[0]
+    host.should.equal metric.hostname
+    gmond.hosts[metric.hostname].info.spoof.should.equal metric.spoof
+    parseInt(gmond.hosts[metric.hostname].info.value).should.equal metric.value
     done()
 
   it "should be able to add a host with improper ordering", (done) =>
+    metric =
+      hostname: 'awesomehost.mydomain.com',
+      group: 'testgroup'
+      spoof: true
+      units: 'widgets/sec'
+      slope: 'positive'
+      name: 'bestmetric'
+      value: 10
+      type: 'int32'
+
+    pmetric = gmetric.pack(metric)
+    gmond.add_metric(pmetric.meta)
+    gmond.add_metric(pmetric.data)
+    host = Object.keys(gmond.hosts)[0]
+    host.should.equal metric.hostname
+    gmond.hosts[metric.hostname].cluster.should.equal 'main'
+    parseInt(gmond.hosts[metric.hostname].info.value).should.equal metric.value
     done()
 
   it "should be able to add a host with no cluster (default)", (done) =>
@@ -36,10 +75,34 @@ describe 'Gmond', ->
       value: 10
       type: 'int32'
 
-    console.log gmetric.pack(metric)
+    pmetric = gmetric.pack(metric)
+    gmond.add_metric(pmetric.meta)
+    gmond.add_metric(pmetric.data)
+    host = Object.keys(gmond.hosts)[0]
+    host.should.equal metric.hostname
+    gmond.hosts[metric.hostname].cluster.should.equal 'main'
+    parseInt(gmond.hosts[metric.hostname].info.value).should.equal metric.value
     done()
 
   it "should be able to add a host with a config'd cluster", (done) =>
+    metric =
+      hostname: 'awesomehost.mydomain.com',
+      cluster: 'myexamplecluster'
+      group: 'testgroup'
+      spoof: true
+      units: 'widgets/sec'
+      slope: 'positive'
+      name: 'bestmetric'
+      value: 10
+      type: 'int32'
+
+    pmetric = gmetric.pack(metric)
+    gmond.add_metric(pmetric.meta)
+    gmond.add_metric(pmetric.data)
+    host = Object.keys(gmond.hosts)[0]
+    host.should.equal metric.hostname
+    gmond.hosts[metric.hostname].cluster.should.equal metric.cluster
+    parseInt(gmond.hosts[metric.hostname].info.value).should.equal metric.value
     done()
 
   it "should be able to generate a host xml element", (done) =>

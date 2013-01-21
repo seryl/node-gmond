@@ -16,24 +16,36 @@ class Gmond
     @config = Config.get()
     @logger = Logger.get()
     @gmetric = new Gmetric()
-    @gmond_started = unix_time()
+
+    @gmond_started = @unix_time()
+    @host_timers = new Object()
+    @hosts = new Object()
+
+    @udp_server = null
+    @xml_server = null
 
     # start_udp_service()
     @start_xml_service()
-
-    @clusters = new Object()
 
   ###*
    * Starts up the xml service.
   ###
   start_xml_service: =>
-    @logger.info 'Starting xml service'
-    server = net.createServer (sock) =>
+    @xml_server = net.createServer (sock) =>
       sock.end(@generate_xml_snapshot())
-    server.listen(@config.get('gmond_tcp_port'), @config.get('listen_address'))
+    @xml_server.listen @config.get('gmond_tcp_port')
+      , @config.get('listen_address')
+
+  ###*
+   * Stops the xml service.
+   * @param {Function} (fn) The callback function
+  ###
+  stop_xml_service: (fn) =>
+    @xml_server.close(fn)
 
   ###*
    * Returns the current unix timestamp.
+   * @return {Integer} The unix timestamp integer
   ###
   unix_time: ->
     new Date().getTime()
@@ -43,20 +55,39 @@ class Gmond
    * @param {Object} (metric)
   ###
   add_metric: (metric) =>
-    hmet = @gmetric.parse
-    hmet = hashify_metric(metric)
-    cluster = @determine_cluster_from_metric(hmet)
-    @clusters[hmet.cluster] ||= new Object()
-
-  determine_cluster_from_metric: (metric) =>
-    return "analytics"
+    msg_type = metric.readInt32BE(0)
+    hmet = @gmetric.unpack(metric)
+    @hosts[hmet.hostname] ||= new Object()
+    if msg_type == 128
+      cluster = @determine_cluster_from_metric(hmet)
+      @hosts[hmet.hostname].cluster ||= cluster
+    @merge_metric @hosts[hmet.hostname], hmet
 
   ###*
-   * Generates a hashmap reference of a gmetric object.
+   * Merges a metric with the hosts object.
+   * @param {Object} (target) The target hosts object to modify
+   * @param {Object} (gmetric) The host information to merge
   ###
-  hashify_metric: (metric) =>
-    hmet = @gmetric.
-    return
+  merge_metric: (target, hmetric) =>
+    extra_elements = @gmetric.extra_elements(hmetric)
+    target['info'] ||= new Object()
+    target['extras'] ||= new Object()
+    for key in Object.keys(hmetric)
+      if key in extra_elements
+        target['extras'][key] = hmetric[key]
+      else
+        target['info'][key] = hmetric[key]
+
+  ###*
+   * Returns the cluster of the metric or assumes the default.
+   * @param {H}
+  ###
+  determine_cluster_from_metric: (hmetric) =>
+    cluster = hmetric['cluster']
+    if cluster == undefined
+      cluster = @config.get('cluster')
+    delete hmetric['cluster']
+    return cluster
 
   ###*
    * Generates an xml snapshot of the gmond state.
