@@ -56,8 +56,8 @@ describe 'Gmond', ->
       type: 'int32'
 
     pmetric = gmetric.pack(metric)
-    gmond.add_metric(pmetric.meta)
     gmond.add_metric(pmetric.data)
+    gmond.add_metric(pmetric.meta)
     host = Object.keys(gmond.hosts)[0]
     host.should.equal metric.hostname
     gmond.hosts[metric.hostname].cluster.should.equal 'main'
