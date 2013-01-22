@@ -5,12 +5,24 @@ Gmond = require '../lib/gmond'
 describe 'Gmond', ->
   gmetric = new Gmetric()
   gmond = null
+  metric = {}
 
   beforeEach (done) ->
     gmond = new Gmond()
+    metric =
+      hostname: 'awesomehost.mydomain.com'
+      cluster: 'myexamplecluster'
+      group: 'testgroup'
+      spoof: true
+      units: 'widgets/sec'
+      slope: 'positive'
+      name: 'bestmetric'
+      value: 10
+      type: 'int32'
     done()
 
   afterEach (done) ->
+    metric = {}
     gmond.stop_xml_service () =>
       gmond = null
       done()
@@ -25,48 +37,31 @@ describe 'Gmond', ->
     done()
 
   it "should be able to add a host with proper packet ordering", (done) =>
-    metric =
-      hostname: 'awesomehost.mydomain.com',
-      group: 'testgroup'
-      spoof: true
-      units: 'widgets/sec'
-      slope: 'positive'
-      name: 'bestmetric'
-      value: 10
-      type: 'int32'
-
     pmetric = gmetric.pack(metric)
     gmond.add_metric(pmetric.meta)
     gmond.add_metric(pmetric.data)
     host = Object.keys(gmond.hosts)[0]
     host.should.equal metric.hostname
-    gmond.hosts[metric.hostname].info.spoof.should.equal metric.spoof
-    parseInt(gmond.hosts[metric.hostname].info.value).should.equal metric.value
+    gmond.hosts[metric.hostname].metrics[metric.name]
+      .spoof.should.equal metric.spoof
+    parseInt(gmond.hosts[metric.hostname].metrics[metric.name].value)
+      .should.equal metric.value
     done()
 
   it "should be able to add a host with improper ordering", (done) =>
-    metric =
-      hostname: 'awesomehost.mydomain.com',
-      group: 'testgroup'
-      spoof: true
-      units: 'widgets/sec'
-      slope: 'positive'
-      name: 'bestmetric'
-      value: 10
-      type: 'int32'
-
     pmetric = gmetric.pack(metric)
     gmond.add_metric(pmetric.data)
     gmond.add_metric(pmetric.meta)
     host = Object.keys(gmond.hosts)[0]
     host.should.equal metric.hostname
-    gmond.hosts[metric.hostname].cluster.should.equal 'main'
-    parseInt(gmond.hosts[metric.hostname].info.value).should.equal metric.value
+    gmond.hosts[metric.hostname].cluster.should.equal 'myexamplecluster'
+    parseInt(gmond.hosts[metric.hostname].metrics[metric.name].value)
+      .should.equal metric.value
     done()
 
   it "should be able to add a host with no cluster (default)", (done) =>
     metric =
-      hostname: 'awesomehost.mydomain.com',
+      hostname: 'awesomehost.mydomain.com'
       group: 'testgroup'
       spoof: true
       units: 'widgets/sec'
@@ -81,34 +76,89 @@ describe 'Gmond', ->
     host = Object.keys(gmond.hosts)[0]
     host.should.equal metric.hostname
     gmond.hosts[metric.hostname].cluster.should.equal 'main'
-    parseInt(gmond.hosts[metric.hostname].info.value).should.equal metric.value
+    parseInt(gmond.hosts[metric.hostname].metrics[metric.name].value)
+      .should.equal metric.value
     done()
 
   it "should be able to add a host with a config'd cluster", (done) =>
-    metric =
-      hostname: 'awesomehost.mydomain.com',
-      cluster: 'myexamplecluster'
-      group: 'testgroup'
-      spoof: true
-      units: 'widgets/sec'
-      slope: 'positive'
-      name: 'bestmetric'
-      value: 10
-      type: 'int32'
-
     pmetric = gmetric.pack(metric)
     gmond.add_metric(pmetric.meta)
     gmond.add_metric(pmetric.data)
     host = Object.keys(gmond.hosts)[0]
     host.should.equal metric.hostname
     gmond.hosts[metric.hostname].cluster.should.equal metric.cluster
-    parseInt(gmond.hosts[metric.hostname].info.value).should.equal metric.value
+    parseInt(gmond.hosts[metric.hostname].metrics[metric.name].value)
+      .should.equal metric.value
+    done()
+
+  it "should be able to generate an xml root", (done) =>
+    root = gmond.get_gmond_xml_root()
+    root.isRoot.should.equal true
+    root.name.should.equal 'GANGLIA_XML'
+    done()
+
+  it "shoudle be able to generate extra xml elements", (done) =>
+    root = gmond.get_gmond_xml_root()
+    gmond.generate_extra_elements(root, metric)
+    extra = root.children[0]
+    extra.isRoot.should.equal false
+    extra.name.should.equal 'EXTRA_DATA'
+    extra_elem = extra.children[0]
+    extra_elem.name.should.equal 'EXTRA_ELEMENT'
+    extra_elem.attributes['NAME'].should.equal 'cluster'
+    extra_elem.attributes['VAL'].should.equal 'myexamplecluster'
+    done()
+
+  it "should be able to generate a single metric element", (done) =>
+    host = new Object()
+    now = new Date().getTime()
+    host['host_reported'] = now
+    host['metrics'] = new Object()
+    host['metrics']['bestmetric'] = metric
+    host['reported'] = new Object()
+    host['reported']['bestmetric'] = now
+
+    root = gmond.get_gmond_xml_root()
+    gmond.generate_metric_element(root, host, metric)
+    metric_elem = root.children[0]
+    metric_elem.isRoot.should.equal false
+    metric_elem.name.should.equal 'METRIC'
+    metric_elem.attributes['NAME'].should.equal 'bestmetric'
+    metric_elem.attributes['VAL'].should.equal '10'
+    metric_elem.attributes['TYPE'].should.equal 'int32'
+    metric_elem.attributes['UNITS'].should.equal 'widgets/sec'
+    tn = parseInt(metric_elem.attributes['TN'])
+    (tn <= new Date().getTime()).should.equal true
+    metric_elem.attributes['TMAX'].should.equal '60'
+    metric_elem.attributes['DMAX'].should.equal '3600'
+    metric_elem.attributes['SLOPE'].should.equal 'positive'
+    extra = metric_elem.children[0]
+    extra.name.should.equal 'EXTRA_DATA'
     done()
 
   it "should be able to generate a host xml element", (done) =>
-    done()
+    now = new Date().getTime()
+    root = gmond.get_gmond_xml_root()
+    pmetric = gmetric.pack(metric)
+    gmond.add_metric(pmetric.meta)
+    gmond.add_metric(pmetric.data)
+    hostname = Object.keys(gmond.hosts)[0]
+    host = gmond.hosts[hostname]
+    gmond.generate_host_element(root, host, hostname)
+    host_elem = root.children[0]
+    host_elem.name.should.equal 'HOST'
+    host_elem.attributes['NAME'].should.equal hostname
+    host_elem.attributes['IP'].should.equal hostname
+    host_elem.attributes['TAGS'].should.equal ''
+    (parseInt(host_elem.attributes['REPORTED']) <= now).should.equal true
+    (parseInt(host_elem.attributes['TN']) >= 0).should.equal true
+    host_elem.attributes['TMAX'].should.equal '60'
+    host_elem.attributes['DMAX'].should.equal '3600'
+    host_elem.attributes['LOCATION'].should.equal 'unspecified'
+    (parseInt(host_elem.attributes['GMOND_STARTED']) <= now).should.equal true
 
-  it "should be able to generate an extra_elem xml element", (done) =>
+    m_elem = host_elem.children[0]
+    m_elem.name.should.equal 'METRIC'
     done()
 
   it "should be to generate location and cluster info", (done) =>

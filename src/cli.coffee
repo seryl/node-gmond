@@ -39,6 +39,11 @@ class CLI
       .describe('D', 'The dmax of a ganglia host (host TTL for cleanup)')
       .default('D', 3600)
 
+      # ganglia default tmax
+      .alias('m', 'tmax')
+      .describe('m', 'The tmax of a ganglia metric (metric TTL for cleanup)')
+      .default('m', 60)
+
       # cleanup threshold in seconds
       .alias('T', 'cleanup_threshold')
       .describe('T', 'The interval in seconds for checking dmax expiration')

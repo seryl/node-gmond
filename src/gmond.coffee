@@ -1,6 +1,5 @@
 Gmetric = require 'gmetric'
 net = require 'net'
-
 builder = require 'xmlbuilder'
 
 Logger = require './logger'
@@ -20,6 +19,7 @@ class Gmond
     @gmond_started = @unix_time()
     @host_timers = new Object()
     @hosts = new Object()
+    @clusters = new Object()
 
     @udp_server = null
     @xml_server = null
@@ -61,6 +61,8 @@ class Gmond
     if msg_type == 128
       cluster = @determine_cluster_from_metric(hmet)
       @hosts[hmet.hostname].cluster ||= cluster
+      @clusters[cluster] ||= new Object()
+      @clusters[cluster][hmet.hostname] = true
     @merge_metric @hosts[hmet.hostname], hmet
 
   ###*
@@ -69,14 +71,17 @@ class Gmond
    * @param {Object} (gmetric) The host information to merge
   ###
   merge_metric: (target, hmetric) =>
-    extra_elements = @gmetric.extra_elements(hmetric)
+    now = @unix_time()
+    target['host_reported'] = now
     target['info'] ||= new Object()
-    target['extras'] ||= new Object()
+    target['reported'] ||= new Object()
+    target['tags'] ||= new Array()
+    target['ip'] ||= hmetric.hostname
+    target['metrics'] ||= new Object()
+    target['metrics'][hmetric.name] ||= new Object()
     for key in Object.keys(hmetric)
-      if key in extra_elements
-        target['extras'][key] = hmetric[key]
-      else
-        target['info'][key] = hmetric[key]
+      target['metrics'][hmetric.name][key] = hmetric[key]
+    target['reported'][hmetric.name] = now
 
   ###*
    * Returns the cluster of the metric or assumes the default.
@@ -111,49 +116,49 @@ class Gmond
     ce.att('LATLONG', @clusters[cluster].latlong || @config.get('latlong'))
     ce.att('URL', @clusters[cluster].url || @config.get('url'))
 
-    if @clusters[cluster].hosts == undefined
-      return root
+    # if @clusters[cluster].hosts == undefined
+    #   return root
 
-    hostlist = Object.keys(@clusters[cluster].hosts)
-    if hostlist.length == 0
-      return root
+    # hostlist = Object.keys(@clusters[cluster].hosts)
+    # if hostlist.length == 0
+    #   return root
 
-    for h in hostlist
-      ce = generate_host_element(ce, @clusters[cluster]['hosts'][h])
+    # for h in hostlist
+    #   ce = generate_host_element(ce, @clusters[cluster]['hosts'][h], h)
     return root
 
   ###*
    * Generates a host element for a given host and attaches to the parent.
   ###
-  generate_host_element: (parent, host) ->
+  generate_host_element: (parent, host, hostname) ->
     he = parent.ele('HOST')
-    he.att('NAME', h)
+    he.att('NAME', hostname)
     he.att('IP', host['ip'])
-    he.att('TAGS', (host['tags'] or []).join(','))
-    he.att('REPORTED', host['reported'])
-    he.att('TN', @unix_time() - host.tmax)
+    he.att('TAGS', (host['tags'] || []).join(','))
+    he.att('REPORTED', host['host_reported'])
+    he.att('TN', @unix_time() - host['host_reported'])
     he.att('TMAX', host.tmax || @config.get('tmax'))
     he.att('DMAX', host.dmax || @config.get('dmax'))
     he.att('LOCATION', host.location || @config.get('latlong'))
     he.att('GMOND_STARTED', @gmond_started)
-    for m in host.metrics
-      he = generate_metric_element(he, m)
+    for m in Object.keys(host.metrics)
+      he = @generate_metric_element(he, host, host.metrics[m])
     return parent
 
   ###*
    * Generates the metric element and attaches to the parent.
   ###
-  generate_metric_element: (parent, metric) ->
+  generate_metric_element: (parent, host, metric) ->
     me = parent.ele('METRIC')
-    me.att('NAME', m.name)
-    me.att('VAL', m.value)
-    me.att('TYPE', m.type)
-    me.att('UNITS', m.units)
-    me.att('TN', @unix_time())
-    me.att('TMAX', m.tmax || @config.get('tmax'))
-    me.att('DMAX', m.dmax || @config.get('dmax'))
-    me.att('SLOPE', m.slope)
-    me = generate_elements(me, metric)
+    me.att('NAME', metric.name)
+    me.att('VAL', metric.value)
+    me.att('TYPE', metric.type)
+    me.att('UNITS', metric.units)
+    me.att('TN', @unix_time() - host['reported'][metric.name])
+    me.att('TMAX', metric.tmax || @config.get('tmax'))
+    me.att('DMAX', metric.dmax || @config.get('dmax'))
+    me.att('SLOPE', metric.slope)
+    me = @generate_extra_elements(me, metric)
     return parent
 
   ###*
