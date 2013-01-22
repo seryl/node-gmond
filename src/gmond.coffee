@@ -1,6 +1,7 @@
 Gmetric = require 'gmetric'
 net = require 'net'
 builder = require 'xmlbuilder'
+dgram = require 'dgram'
 
 Logger = require './logger'
 CLI = require './cli'
@@ -15,6 +16,7 @@ class Gmond
     @config = Config.get()
     @logger = Logger.get()
     @gmetric = new Gmetric()
+    @socket = dgram.createSocket('udp4')
 
     @gmond_started = @unix_time()
     @host_timers = new Object()
@@ -24,8 +26,23 @@ class Gmond
     @udp_server = null
     @xml_server = null
 
-    # start_udp_service()
+    @start_udp_service()
     @start_xml_service()
+
+  ###*
+   * Starts the udp gmond service.
+  ###
+  start_udp_service: =>
+    @socket.on 'message', (msg, rinfo) =>
+      @add_metric(msg)
+
+    @socket.bind(@config.get('gmond_udp_port'))
+
+  ###*
+   * Stops the udp gmond service.
+  ###
+  stop_udp_service: =>
+    @socket.close()
 
   ###*
    * Starts up the xml service.
@@ -44,6 +61,14 @@ class Gmond
     @xml_server.close(fn)
 
   ###*
+   * Stops all external services.
+   * @param {Function} (fn) The callback function
+  ###
+  stop_services: (fn) =>
+    @stop_udp_service()
+    @stop_xml_service(fn)
+
+  ###*
    * Returns the current unix timestamp.
    * @return {Integer} The unix timestamp integer
   ###
@@ -56,15 +81,16 @@ class Gmond
   ###
   add_metric: (metric) =>
     msg_type = metric.readInt32BE(0)
-    hmet = @gmetric.unpack(metric)
-    @hosts[hmet.hostname] ||= new Object()
-    if msg_type == 128
-      cluster = @determine_cluster_from_metric(hmet)
-      @hosts[hmet.hostname].cluster ||= cluster
-      @clusters[cluster] ||= new Object()
-      @clusters[cluster].hosts ||= new Object()
-      @clusters[cluster].hosts[hmet.hostname] = true
-    @merge_metric @hosts[hmet.hostname], hmet
+    if (msg_type == 128) || (msg_type == 133)
+      hmet = @gmetric.unpack(metric)
+      @hosts[hmet.hostname] ||= new Object()
+      if msg_type == 128
+        cluster = @determine_cluster_from_metric(hmet)
+        @hosts[hmet.hostname].cluster ||= cluster
+        @clusters[cluster] ||= new Object()
+        @clusters[cluster].hosts ||= new Object()
+        @clusters[cluster].hosts[hmet.hostname] = true
+      @merge_metric @hosts[hmet.hostname], hmet
 
   ###*
    * Merges a metric with the hosts object.
@@ -74,7 +100,6 @@ class Gmond
   merge_metric: (target, hmetric) =>
     now = @unix_time()
     target['host_reported'] = now
-    target['info'] ||= new Object()
     target['reported'] ||= new Object()
     target['tags'] ||= new Array()
     target['ip'] ||= hmetric.hostname

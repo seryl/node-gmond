@@ -23,7 +23,7 @@ describe 'Gmond', ->
 
   afterEach (done) ->
     metric = {}
-    gmond.stop_xml_service () =>
+    gmond.stop_services () =>
       gmond = null
       done()
 
@@ -207,3 +207,14 @@ describe 'Gmond', ->
     snapshot = gmond.generate_xml_snapshot()
     snapshot.match(/GANGLIA_XML/).should.not.equal null
     done()
+
+  it "should be able to obtain metrics via udp", (done) =>
+    sock = dgram.createSocket('udp4')
+
+    check_complete = () =>
+      hosts = Object.keys(gmond.hosts)
+      hosts[0].should.equal metric.hostname
+      done()
+
+    monitor = setInterval(check_complete, 5)
+    gmetric.send('127.0.0.1', @config.get('gmond_udp_port'), metric)
