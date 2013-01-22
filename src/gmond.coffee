@@ -77,7 +77,7 @@ class Gmond
 
   ###*
    * Adds a new metric automatically determining the cluster or using defaults.
-   * @param {Object} (metric)
+   * @param {Object} (metric) The raw metric packet to add
   ###
   add_metric: (metric) =>
     msg_type = metric.readInt32BE(0)
@@ -95,7 +95,7 @@ class Gmond
   ###*
    * Merges a metric with the hosts object.
    * @param {Object} (target) The target hosts object to modify
-   * @param {Object} (gmetric) The host information to merge
+   * @param {Object} (hgmetric) The host information to merge
   ###
   merge_metric: (target, hmetric) =>
     now = @unix_time()
@@ -111,7 +111,8 @@ class Gmond
 
   ###*
    * Returns the cluster of the metric or assumes the default.
-   * @param {H}
+   * @param  {Object} (hgmetric) The host information to merge
+   * @return {String} The name of the cluster for the metric
   ###
   determine_cluster_from_metric: (hmetric) =>
     cluster = hmetric['cluster']
@@ -122,12 +123,14 @@ class Gmond
 
   ###*
    * Generates an xml snapshot of the gmond state.
+   * @return {String} The ganglia xml snapshot pretty-printed
   ###
   generate_xml_snapshot: =>
     @generate_ganglia_xml().end({ pretty: true, indent: '  ', newline: "\n" })
 
   ###*
    * Generates the xml builder for a ganglia xml view.
+   * @return {Object} The root node of the full ganglia xml view
   ###
   generate_ganglia_xml: =>
     root = @get_gmond_xml_root()
@@ -136,7 +139,10 @@ class Gmond
     return root
 
   ###*
-   * Appends the cluster_xml for a single cluster to the 
+   * Appends the cluster_xml for a single cluster to the a given node.
+   * @param  {Object} (root) The root node to create the cluster element on
+   * @param  {String} (cluster) The cluster to generate elements for
+   * @return {Object} The root node with the newly attached cluster
   ###
   generate_cluster_element: (root, cluster) =>
     if Object.keys(@clusters[cluster].hosts).length == 0
@@ -161,32 +167,40 @@ class Gmond
 
   ###*
    * Generates a host element for a given host and attaches to the parent.
+   * @param  {Object} (parent)   The parent node to append the host elem to
+   * @param  {Object} (hostinfo) The host information for the given host
+   * @param  {String} (hostname) The hostname of the current host
+   * @return {Object} The parent node with host elements attached
   ###
-  generate_host_element: (parent, host, hostname) ->
+  generate_host_element: (parent, hostinfo, hostname) ->
     he = parent.ele('HOST')
     he.att('NAME', hostname)
-    he.att('IP', host['ip'])
-    he.att('TAGS', (host['tags'] || []).join(','))
-    he.att('REPORTED', host['host_reported'])
-    he.att('TN', @unix_time() - host['host_reported'])
-    he.att('TMAX', host.tmax || @config.get('tmax'))
-    he.att('DMAX', host.dmax || @config.get('dmax'))
-    he.att('LOCATION', host.location || @config.get('latlong'))
+    he.att('IP', hostinfo['ip'])
+    he.att('TAGS', (hostinfo['tags'] || []).join(','))
+    he.att('REPORTED', hostinfo['host_reported'])
+    he.att('TN', @unix_time() - hostinfo['host_reported'])
+    he.att('TMAX', hostinfo.tmax || @config.get('tmax'))
+    he.att('DMAX', hostinfo.dmax || @config.get('dmax'))
+    he.att('LOCATION', hostinfo.location || @config.get('latlong'))
     he.att('GMOND_STARTED', @gmond_started)
-    for m in Object.keys(host.metrics)
-      he = @generate_metric_element(he, host, host.metrics[m])
+    for m in Object.keys(hostinfo.metrics)
+      he = @generate_metric_element(he, hostinfo, hostinfo.metrics[m])
     return parent
 
   ###*
    * Generates the metric element and attaches to the parent.
+   * @param  {Object} (parent) The parent node to append the metric elem to
+   * @param  {Object} (host)   The host information for the given metric
+   * @param  {Object} (metric) The metric to generate metric xml from
+   * @return {Object} The parent node with metric elements attached
   ###
-  generate_metric_element: (parent, host, metric) ->
+  generate_metric_element: (parent, hostinfo, metric) ->
     me = parent.ele('METRIC')
     me.att('NAME', metric.name)
     me.att('VAL', metric.value)
     me.att('TYPE', metric.type)
     me.att('UNITS', metric.units)
-    me.att('TN', @unix_time() - host['reported'][metric.name])
+    me.att('TN', @unix_time() - hostinfo['reported'][metric.name])
     me.att('TMAX', metric.tmax || @config.get('tmax'))
     me.att('DMAX', metric.dmax || @config.get('dmax'))
     me.att('SLOPE', metric.slope)
@@ -195,6 +209,9 @@ class Gmond
 
   ###*
    * Generates the extra elems for a metric and attaches to the parent.
+   * @param  {Object} (parent) The parent node to append the extra data to
+   * @param  {Object} (metric) The metric to generate extra_elements from
+   * @return {Object} The parent node with extra elements attached
   ###
   generate_extra_elements: (parent, metric) ->
     extras = @gmetric.extra_elements(metric)
