@@ -137,11 +137,11 @@ describe 'Gmond', ->
     done()
 
   it "should be able to generate a host xml element", (done) =>
-    now = new Date().getTime()
     root = gmond.get_gmond_xml_root()
     pmetric = gmetric.pack(metric)
     gmond.add_metric(pmetric.meta)
     gmond.add_metric(pmetric.data)
+    now = new Date().getTime()
     hostname = Object.keys(gmond.hosts)[0]
     host = gmond.hosts[hostname]
     gmond.generate_host_element(root, host, hostname)
@@ -156,16 +156,54 @@ describe 'Gmond', ->
     host_elem.attributes['DMAX'].should.equal '3600'
     host_elem.attributes['LOCATION'].should.equal 'unspecified'
     (parseInt(host_elem.attributes['GMOND_STARTED']) <= now).should.equal true
-
     m_elem = host_elem.children[0]
     m_elem.name.should.equal 'METRIC'
     done()
 
   it "should be to generate location and cluster info", (done) =>
-    done()
-
-  it "should be able to return an xml cluster for metrics", (done) =>
+    root = gmond.get_gmond_xml_root()
+    pmetric = gmetric.pack(metric)
+    gmond.add_metric(pmetric.meta)
+    gmond.add_metric(pmetric.data)
+    gmond.generate_cluster_element(root, Object.keys(gmond.clusters)[0])
+    cluster_elem = root.children[0]
+    cluster_elem.name.should.equal 'CLUSTER'
+    cluster_elem.attributes['NAME'].should.equal 'myexamplecluster'
+    localtime = parseInt(cluster_elem.attributes['LOCALTIME'])
+    (localtime <= new Date().getTime()).should.equal true
+    cluster_elem.attributes['OWNER'].should.equal 'unspecified'
+    cluster_elem.attributes['LATLONG'].should.equal 'unspecified'
+    cluster_elem.attributes['URL'].should.equal '127.0.0.1'
+    host_elem = cluster_elem.children[0]
+    host_elem.name.should.equal 'HOST'
     done()
 
   it "should generate one cluster element per cluster", (done) =>
+    metric2 =
+      hostname: 'awesomehost2.mydomain.com'
+      cluster: 'blehcluster'
+      group: 'testgroup2'
+      spoof: true
+      units: 'widgets/sec'
+      slope: 'positive'
+      name: 'bestmetric2'
+      value: 10
+      type: 'int32'
+
+    pmetric = gmetric.pack(metric)
+    gmond.add_metric(pmetric.meta)
+    gmond.add_metric(pmetric.data)
+    pmetric2 = gmetric.pack(metric2)
+    gmond.add_metric(pmetric2.meta)
+    gmond.add_metric(pmetric2.data)
+    root = gmond.generate_ganglia_xml()
+    root.children.length.should.equal 2
+    done()
+
+  it "should be able to return an xml cluster for metrics", (done) =>
+    pmetric = gmetric.pack(metric)
+    gmond.add_metric(pmetric.meta)
+    gmond.add_metric(pmetric.data)
+    snapshot = gmond.generate_xml_snapshot()
+    snapshot.match(/GANGLIA_XML/).should.not.equal null
     done()

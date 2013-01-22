@@ -62,7 +62,8 @@ class Gmond
       cluster = @determine_cluster_from_metric(hmet)
       @hosts[hmet.hostname].cluster ||= cluster
       @clusters[cluster] ||= new Object()
-      @clusters[cluster][hmet.hostname] = true
+      @clusters[cluster].hosts ||= new Object()
+      @clusters[cluster].hosts[hmet.hostname] = true
     @merge_metric @hosts[hmet.hostname], hmet
 
   ###*
@@ -98,10 +99,16 @@ class Gmond
    * Generates an xml snapshot of the gmond state.
   ###
   generate_xml_snapshot: =>
+    @generate_ganglia_xml().end({ pretty: true, indent: '  ', newline: "\n" })
+
+  ###*
+   * Generates the xml builder for a ganglia xml view.
+  ###
+  generate_ganglia_xml: =>
     root = @get_gmond_xml_root()
     for cluster in Object.keys(@clusters)
-      root = generate_cluster_element(root, cluster)
-    return root.end({ pretty: true, indent: '  ', newline: "\n" })
+      root = @generate_cluster_element(root, cluster)
+    return root
 
   ###*
    * Appends the cluster_xml for a single cluster to the 
@@ -110,21 +117,21 @@ class Gmond
     if Object.keys(@clusters[cluster].hosts).length == 0
       delete_cluster(cluster)
     ce = root.ele('CLUSTER')
-    ce.att('NAME', @clusters[cluster].name || @config.get('cluster'))
+    ce.att('NAME', cluster || @config.get('cluster'))
     ce.att('LOCALTIME', new Date().getTime())
     ce.att('OWNER', @clusters[cluster].owner || @config.get('owner'))
     ce.att('LATLONG', @clusters[cluster].latlong || @config.get('latlong'))
     ce.att('URL', @clusters[cluster].url || @config.get('url'))
 
-    # if @clusters[cluster].hosts == undefined
-    #   return root
+    if @clusters[cluster] == undefined
+      return root
 
-    # hostlist = Object.keys(@clusters[cluster].hosts)
-    # if hostlist.length == 0
-    #   return root
+    hostlist = Object.keys(@clusters[cluster].hosts)
+    if hostlist.length == 0
+      return root
 
-    # for h in hostlist
-    #   ce = generate_host_element(ce, @clusters[cluster]['hosts'][h], h)
+    for h in hostlist
+      ce = @generate_host_element(ce, @hosts[h], h)
     return root
 
   ###*
