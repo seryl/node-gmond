@@ -1,7 +1,8 @@
-Gmetric = require 'gmetric'
 net = require 'net'
-builder = require 'xmlbuilder'
 dgram = require 'dgram'
+Gmetric = require 'gmetric'
+builder = require 'xmlbuilder'
+async = require 'async'
 
 Logger = require './logger'
 CLI = require './cli'
@@ -20,6 +21,7 @@ class Gmond
 
     @gmond_started = @unix_time()
     @host_timers = new Object()
+    @metric_timers = new Object()
     @hosts = new Object()
     @clusters = new Object()
 
@@ -68,6 +70,21 @@ class Gmond
     @stop_udp_service()
     @stop_xml_service(fn)
 
+  # ###*
+  #  * Stop all timers.
+  # ###
+  # stop_timers: (fn) =>
+  #   htimers = Object.keys(@host_timers)
+  #   mtimers = Object.keys(@metric_timers)
+
+  #   for ht in htimers
+  #     clearInterval(@host_timers[ht])
+  #     delete(@host_timers[ht])
+
+  #   for mt in mtimers
+  #     clearInterval(@metric_timers[mt])
+  #     delete(@metric_timers[mt])
+
   ###*
    * Returns the current unix timestamp.
    * @return {Integer} The unix timestamp integer
@@ -90,7 +107,50 @@ class Gmond
         @clusters[cluster] ||= new Object()
         @clusters[cluster].hosts ||= new Object()
         @clusters[cluster].hosts[hmet.hostname] = true
+      # @set_metric_timer(hmet)
+      # @set_host_timer(hmet)
       @merge_metric @hosts[hmet.hostname], hmet
+
+  # ###*
+  #  * Sets up the host DMAX timer for host cleanup.
+  #  * @param {Object} (hmetric) The host metric information
+  # ###
+  # set_host_timer: (hmetric) =>
+  #   @host_timers[hmetric.hostname] ||= setInterval () =>
+  #     try
+  #       timeout = @hosts[hmetric.hostname].dmax || @config.get('dmax')
+  #       console.log "timeout: #{timeout}"
+  #       tn = @unix_time() - @hosts[hmetric.hostname]['host_reported']
+  #       console.log "tn: #{tn}"
+  #       if tn > timeout
+  #         cluster = hmetric.cluster
+  #         delete @hosts[hmetric.hostname]
+  #         if @clusters[cluster] and @clusters[cluster].hosts
+  #           delete @clusters[cluster].hosts[hmetric.hostname]
+  #         clearInterval(@host_timers[hmetric.hostname])
+  #         delete @host_timers[hmetric.hostname]
+  #     catch e
+  #       null
+  #   , @config.get('cleanup_threshold') * 1000
+
+  # ###*
+  #  * Sets up the metric DMAX timer for metric cleanup.
+  #  * @param {Object} (hmetric) The host metric information
+  # ###
+  # set_metric_timer: (hmetric) =>
+  #   metric_key = [hmetric.hostname, hmetric.name].join('|')
+  #   @metric_timers[metric_key] ||= setInterval () =>
+  #     try
+  #       timeout = hmetric.dmax || @config.get('dmax')
+  #       tn = @unix_time() - @hosts[hmetric.hostname]['reported'][hmetric.name]
+  #       if tn > timeout
+  #         if @hosts[gmetric.hostname] and @hosts[hmetric.hostname]['metrics']
+  #           delete @hosts[hmetric.hostname]['metrics'][hmetric.name]
+  #         clearInterval(@metric_timers[metric_key])
+  #         delete @metric_timers[metric_key]
+  #     catch e
+  #       null
+  #   , @config.get('cleanup_threshold') * 1000
 
   ###*
    * Merges a metric with the hosts object.
@@ -115,9 +175,7 @@ class Gmond
    * @return {String} The name of the cluster for the metric
   ###
   determine_cluster_from_metric: (hmetric) =>
-    cluster = hmetric['cluster']
-    if cluster == undefined
-      cluster = @config.get('cluster')
+    cluster = hmetric['cluster'] || @config.get('cluster')
     delete hmetric['cluster']
     return cluster
 

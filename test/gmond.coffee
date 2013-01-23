@@ -1,6 +1,8 @@
 dgram = require 'dgram'
-Gmetric = require 'gmetric'
 Gmond = require '../lib/gmond'
+
+Gmetric = require 'gmetric'
+async = require 'async'
 
 describe 'Gmond', ->
   gmetric = new Gmetric()
@@ -24,6 +26,7 @@ describe 'Gmond', ->
   afterEach (done) ->
     metric = {}
     gmond.stop_services () =>
+      # gmond.stop_timers()
       gmond = null
       done()
 
@@ -60,16 +63,7 @@ describe 'Gmond', ->
     done()
 
   it "should be able to add a host with no cluster (default)", (done) =>
-    metric =
-      hostname: 'awesomehost.mydomain.com'
-      group: 'testgroup'
-      spoof: true
-      units: 'widgets/sec'
-      slope: 'positive'
-      name: 'bestmetric'
-      value: 10
-      type: 'int32'
-
+    delete metric.cluster
     pmetric = gmetric.pack(metric)
     gmond.add_metric(pmetric.meta)
     gmond.add_metric(pmetric.data)
@@ -218,3 +212,15 @@ describe 'Gmond', ->
 
     monitor = setInterval(check_complete, 5)
     gmetric.send('127.0.0.1', @config.get('gmond_udp_port'), metric)
+
+  # it "should be able to cleanup a host when the DMAX has expired", (done) =>
+  #   metric.dmax = 1
+  #   # console.log metric
+  #   pmetric = gmetric.pack(metric)
+  #   gmond.add_metric(pmetric.meta)
+  #   gmond.add_metric(pmetric.data)
+  #   # console.log gmond.hosts
+  #   done()
+
+  # it "should be able to cleanup a metric when the DMAX has expired", (done) =>
+  #   done()
