@@ -1,6 +1,6 @@
 {
   "name":"gmond",
-  "version":"0.0.1",
+  "version":"0.1.0",
   "description": "A node ganglia-gmond service with support for dynamic ganglia clusters",
   "author": "Josh Toft <joshtoft@gmail.com>",
   "repository": {
