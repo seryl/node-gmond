@@ -23,12 +23,13 @@ describe 'Gmond', ->
       type: 'int32'
     done()
 
-  afterEach (done) ->
+  afterEach (done) =>
     metric = {}
+    @config.overrides({})
     gmond.stop_services () =>
-      # gmond.stop_timers()
-      gmond = null
-      done()
+      gmond.stop_timers () =>
+        gmond = null
+        done()
 
   it "should have a default cluster configuration", (done) =>
     @config.get('dmax').should.equal 3600
@@ -204,23 +205,28 @@ describe 'Gmond', ->
 
   it "should be able to obtain metrics via udp", (done) =>
     sock = dgram.createSocket('udp4')
+    monitor = null
 
     check_complete = () =>
       hosts = Object.keys(gmond.hosts)
       hosts[0].should.equal metric.hostname
+      if monitor then clearInterval(monitor)
       done()
 
     monitor = setInterval(check_complete, 5)
     gmetric.send('127.0.0.1', @config.get('gmond_udp_port'), metric)
 
-  # it "should be able to cleanup a host when the DMAX has expired", (done) =>
-  #   metric.dmax = 1
-  #   # console.log metric
-  #   pmetric = gmetric.pack(metric)
-  #   gmond.add_metric(pmetric.meta)
-  #   gmond.add_metric(pmetric.data)
-  #   # console.log gmond.hosts
-  #   done()
+  it "should be able to cleanup a host when the DMAX has expired", (done) =>
+    @config.overrides({ 'dmax': 1, 'cleanup_threshold': 0.005 })
+    pmetric = gmetric.pack(metric)
+    gmond.add_metric(pmetric.meta)
+    gmond.add_metric(pmetric.data)
+
+    interval = setInterval () =>
+      Object.keys(gmond.hosts).length.should.equal 0
+      clearInterval(interval)
+      done()
+    , 10
 
   # it "should be able to cleanup a metric when the DMAX has expired", (done) =>
   #   done()

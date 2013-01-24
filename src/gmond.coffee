@@ -70,20 +70,21 @@ class Gmond
     @stop_udp_service()
     @stop_xml_service(fn)
 
-  # ###*
-  #  * Stop all timers.
-  # ###
-  # stop_timers: (fn) =>
-  #   htimers = Object.keys(@host_timers)
-  #   mtimers = Object.keys(@metric_timers)
+  ###*
+   * Stop all timers.
+  ###
+  stop_timers: (fn) =>
+    htimers = Object.keys(@host_timers)
+    mtimers = Object.keys(@metric_timers)
+    for ht in htimers
+      clearInterval(@host_timers[ht])
+      delete(@host_timers[ht])
 
-  #   for ht in htimers
-  #     clearInterval(@host_timers[ht])
-  #     delete(@host_timers[ht])
+    for mt in mtimers
+      clearInterval(@metric_timers[mt])
+      delete(@metric_timers[mt])
 
-  #   for mt in mtimers
-  #     clearInterval(@metric_timers[mt])
-  #     delete(@metric_timers[mt])
+    fn()
 
   ###*
    * Returns the current unix timestamp.
@@ -108,30 +109,28 @@ class Gmond
         @clusters[cluster].hosts ||= new Object()
         @clusters[cluster].hosts[hmet.hostname] = true
       # @set_metric_timer(hmet)
-      # @set_host_timer(hmet)
+      @set_host_timer(hmet)
       @merge_metric @hosts[hmet.hostname], hmet
 
-  # ###*
-  #  * Sets up the host DMAX timer for host cleanup.
-  #  * @param {Object} (hmetric) The host metric information
-  # ###
-  # set_host_timer: (hmetric) =>
-  #   @host_timers[hmetric.hostname] ||= setInterval () =>
-  #     try
-  #       timeout = @hosts[hmetric.hostname].dmax || @config.get('dmax')
-  #       console.log "timeout: #{timeout}"
-  #       tn = @unix_time() - @hosts[hmetric.hostname]['host_reported']
-  #       console.log "tn: #{tn}"
-  #       if tn > timeout
-  #         cluster = hmetric.cluster
-  #         delete @hosts[hmetric.hostname]
-  #         if @clusters[cluster] and @clusters[cluster].hosts
-  #           delete @clusters[cluster].hosts[hmetric.hostname]
-  #         clearInterval(@host_timers[hmetric.hostname])
-  #         delete @host_timers[hmetric.hostname]
-  #     catch e
-  #       null
-  #   , @config.get('cleanup_threshold') * 1000
+  ###*
+   * Sets up the host DMAX timer for host cleanup.
+   * @param {Object} (hmetric) The host metric information
+  ###
+  set_host_timer: (hmetric) =>
+    @host_timers[hmetric.hostname] ||= setInterval () =>
+      try
+        timeout = @hosts[hmetric.hostname].dmax || @config.get('dmax')
+        tn = @unix_time() - @hosts[hmetric.hostname]['host_reported']
+        if tn > timeout
+          cluster = hmetric.cluster
+          delete @hosts[hmetric.hostname]
+          if @clusters[cluster] and @clusters[cluster].hasOwnProperty('hosts')
+            delete @clusters[cluster].hosts[hmetric.hostname]
+          clearInterval(@host_timers[hmetric.hostname])
+          delete @host_timers[hmetric.hostname]
+      catch e
+        null
+    , @config.get('cleanup_threshold') * 1000
 
   # ###*
   #  * Sets up the metric DMAX timer for metric cleanup.
@@ -150,7 +149,7 @@ class Gmond
   #         delete @metric_timers[metric_key]
   #     catch e
   #       null
-  #   , @config.get('cleanup_threshold') * 1000
+    # , @config.get('cleanup_threshold') * 1000
 
   ###*
    * Merges a metric with the hosts object.
