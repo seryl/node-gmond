@@ -108,7 +108,7 @@ class Gmond
         @clusters[cluster] ||= new Object()
         @clusters[cluster].hosts ||= new Object()
         @clusters[cluster].hosts[hmet.hostname] = true
-      # @set_metric_timer(hmet)
+      @set_metric_timer(hmet)
       @set_host_timer(hmet)
       @merge_metric @hosts[hmet.hostname], hmet
 
@@ -132,24 +132,24 @@ class Gmond
         null
     , @config.get('cleanup_threshold') * 1000
 
-  # ###*
-  #  * Sets up the metric DMAX timer for metric cleanup.
-  #  * @param {Object} (hmetric) The host metric information
-  # ###
-  # set_metric_timer: (hmetric) =>
-  #   metric_key = [hmetric.hostname, hmetric.name].join('|')
-  #   @metric_timers[metric_key] ||= setInterval () =>
-  #     try
-  #       timeout = hmetric.dmax || @config.get('dmax')
-  #       tn = @unix_time() - @hosts[hmetric.hostname]['reported'][hmetric.name]
-  #       if tn > timeout
-  #         if @hosts[gmetric.hostname] and @hosts[hmetric.hostname]['metrics']
-  #           delete @hosts[hmetric.hostname]['metrics'][hmetric.name]
-  #         clearInterval(@metric_timers[metric_key])
-  #         delete @metric_timers[metric_key]
-  #     catch e
-  #       null
-    # , @config.get('cleanup_threshold') * 1000
+  ###*
+   * Sets up the metric DMAX timer for metric cleanup.
+   * @param {Object} (hmetric) The host metric information
+  ###
+  set_metric_timer: (hmetric) =>
+    metric_key = [hmetric.hostname, hmetric.name].join('|')
+    @metric_timers[metric_key] ||= setInterval () =>
+      try
+        timeout = hmetric.dmax || @config.get('dmax')
+        tn = @unix_time() - @hosts[hmetric.hostname]['reported'][hmetric.name]
+        if tn > timeout
+          if @hosts[gmetric.hostname] and @hosts[hmetric.hostname]['metrics']
+            delete @hosts[hmetric.hostname]['metrics'][hmetric.name]
+          clearInterval(@metric_timers[metric_key])
+          delete @metric_timers[metric_key]
+      catch e
+        null
+    , @config.get('cleanup_threshold') * 1000
 
   ###*
    * Merges a metric with the hosts object.

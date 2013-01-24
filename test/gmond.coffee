@@ -217,16 +217,12 @@ describe 'Gmond', ->
     gmetric.send('127.0.0.1', @config.get('gmond_udp_port'), metric)
 
   it "should be able to cleanup a host when the DMAX has expired", (done) =>
-    @config.overrides({ 'dmax': 1, 'cleanup_threshold': 0.005 })
+    @config.overrides({ 'dmax': 1, 'cleanup_threshold': 0.002 })
     pmetric = gmetric.pack(metric)
     gmond.add_metric(pmetric.meta)
     gmond.add_metric(pmetric.data)
 
-    interval = setInterval () =>
+    setTimeout () =>
       Object.keys(gmond.hosts).length.should.equal 0
-      clearInterval(interval)
       done()
-    , 10
-
-  # it "should be able to cleanup a metric when the DMAX has expired", (done) =>
-  #   done()
+    , 5
