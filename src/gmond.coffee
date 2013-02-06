@@ -91,7 +91,7 @@ class Gmond
    * @return {Integer} The unix timestamp integer
   ###
   unix_time: ->
-    new Date().getTime()
+    Math.floor(new Date().getTime())
 
   ###*
    * Adds a new metric automatically determining the cluster or using defaults.
@@ -239,7 +239,7 @@ class Gmond
     he.att('TMAX', hostinfo.tmax || @config.get('tmax'))
     he.att('DMAX', hostinfo.dmax || @config.get('dmax'))
     he.att('LOCATION', hostinfo.location || @config.get('latlong'))
-    he.att('GMOND_STARTED', @gmond_started)
+    he.att('GMOND_STARTED', 0)
     for m in Object.keys(hostinfo.metrics)
       he = @generate_metric_element(he, hostinfo, hostinfo.metrics[m])
     return parent
