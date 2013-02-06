@@ -278,7 +278,7 @@ class Gmond
     ed = parent.ele('EXTRA_DATA')
     for extra in extras
       ee = ed.ele('EXTRA_ELEMENT')
-      ee.att('NAME', extra)
+      ee.att('NAME', extra.toUpperCase())
       ee.att('VAL', metric[extra])
     return parent
 

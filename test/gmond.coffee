@@ -100,7 +100,7 @@ describe 'Gmond', ->
     extra.name.should.equal 'EXTRA_DATA'
     extra_elem = extra.children[0]
     extra_elem.name.should.equal 'EXTRA_ELEMENT'
-    extra_elem.attributes['NAME'].should.equal 'cluster'
+    extra_elem.attributes['NAME'].should.equal 'CLUSTER'
     extra_elem.attributes['VAL'].should.equal 'myexamplecluster'
     done()
 
