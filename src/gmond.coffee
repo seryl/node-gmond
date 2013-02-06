@@ -339,9 +339,9 @@ class Gmond
       <!ATTLIST METRICS UNITS CDATA #IMPLIED>
       <!ATTLIST METRICS SLOPE (zero | positive | negative | both | unspecified) #IMPLIED>
       <!ATTLIST METRICS SOURCE (gmond) 'gmond'>
-]>
-<GANGLIA_XML VERSION="3.5.0" SOURCE="gmond"
-  """
+]"""
+    root.att('VERSION', '3.5.0')
+    root.att('SOURCE',  'gmond')
     return root
 
 module.exports = Gmond
