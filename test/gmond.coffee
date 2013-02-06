@@ -106,7 +106,7 @@ describe 'Gmond', ->
 
   it "should be able to generate a single metric element", (done) =>
     host = new Object()
-    now = new Date().getTime()
+    now = Math.floor(new Date().getTime() / 1000)
     host['host_reported'] = now
     host['metrics'] = new Object()
     host['metrics']['bestmetric'] = metric
@@ -123,7 +123,7 @@ describe 'Gmond', ->
     metric_elem.attributes['TYPE'].should.equal 'int32'
     metric_elem.attributes['UNITS'].should.equal 'widgets/sec'
     tn = parseInt(metric_elem.attributes['TN'])
-    (tn <= new Date().getTime()).should.equal true
+    (tn <= Math.floor(new Date().getTime() / 1000)).should.equal true
     metric_elem.attributes['TMAX'].should.equal '60'
     metric_elem.attributes['DMAX'].should.equal '3600'
     metric_elem.attributes['SLOPE'].should.equal 'positive'
@@ -136,7 +136,7 @@ describe 'Gmond', ->
     pmetric = gmetric.pack(metric)
     gmond.add_metric(pmetric.meta)
     gmond.add_metric(pmetric.data)
-    now = new Date().getTime()
+    now = Math.floor(new Date().getTime() / 1000)
     hostname = Object.keys(gmond.hosts)[0]
     host = gmond.hosts[hostname]
     gmond.generate_host_element(root, host, hostname)
@@ -155,7 +155,7 @@ describe 'Gmond', ->
     m_elem.name.should.equal 'METRIC'
     done()
 
-  it "should be to generate location and cluster info", (done) =>
+  it "should generate location and cluster info", (done) =>
     root = gmond.get_gmond_xml_root()
     pmetric = gmetric.pack(metric)
     gmond.add_metric(pmetric.meta)
@@ -165,7 +165,7 @@ describe 'Gmond', ->
     cluster_elem.name.should.equal 'CLUSTER'
     cluster_elem.attributes['NAME'].should.equal 'myexamplecluster'
     localtime = parseInt(cluster_elem.attributes['LOCALTIME'])
-    (localtime <= new Date().getTime()).should.equal true
+    (localtime <= Math.floor(new Date().getTime() / 1000)).should.equal true
     cluster_elem.attributes['OWNER'].should.equal 'unspecified'
     cluster_elem.attributes['LATLONG'].should.equal 'unspecified'
     cluster_elem.attributes['URL'].should.equal '127.0.0.1'
@@ -217,7 +217,7 @@ describe 'Gmond', ->
     gmetric.send('127.0.0.1', @config.get('gmond_udp_port'), metric)
 
   it "should be able to cleanup a host when the DMAX has expired", (done) =>
-    @config.overrides({ 'dmax': 1, 'cleanup_threshold': 0.002 })
+    @config.overrides({ 'dmax': 0.1, 'cleanup_threshold': 1 })
     pmetric = gmetric.pack(metric)
     gmond.add_metric(pmetric.meta)
     gmond.add_metric(pmetric.data)
@@ -225,4 +225,4 @@ describe 'Gmond', ->
     setTimeout () =>
       Object.keys(gmond.hosts).length.should.equal 0
       done()
-    , 5
+    , 1000

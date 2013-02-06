@@ -91,7 +91,7 @@ class Gmond
    * @return {Integer} The unix timestamp integer
   ###
   unix_time: ->
-    Math.floor(new Date().getTime())
+    Math.floor(new Date().getTime() / 1000)
 
   ###*
    * Adds a new metric automatically determining the cluster or using defaults.
@@ -130,7 +130,7 @@ class Gmond
           delete @host_timers[hmetric.hostname]
       catch e
         null
-    , @config.get('cleanup_threshold') * 1000
+    , @config.get('cleanup_threshold')
 
   ###*
    * Sets up the metric DMAX timer for metric cleanup.
@@ -149,7 +149,7 @@ class Gmond
           delete @metric_timers[metric_key]
       catch e
         null
-    , @config.get('cleanup_threshold') * 1000
+    , @config.get('cleanup_threshold')
 
   ###*
    * Merges a metric with the hosts object.
@@ -206,7 +206,7 @@ class Gmond
       delete_cluster(cluster)
     ce = root.ele('CLUSTER')
     ce.att('NAME', cluster || @config.get('cluster'))
-    ce.att('LOCALTIME', new Date().getTime())
+    ce.att('LOCALTIME', @unix_time())
     ce.att('OWNER', @clusters[cluster].owner || @config.get('owner'))
     ce.att('LATLONG', @clusters[cluster].latlong || @config.get('latlong'))
     ce.att('URL', @clusters[cluster].url || @config.get('url'))
