@@ -290,8 +290,6 @@ class Gmond
     root = builder.create 'GANGLIA_XML'
     , { version: '1.0', encoding: 'ISO-8859-1'
     , standalone: 'yes' }, ext: """[
-<?xml version="1.0" encoding="ISO-8859-1" standalone="yes"?>
-<!DOCTYPE GANGLIA_XML [
    <!ELEMENT GANGLIA_XML (GRID|CLUSTER|HOST)*>
       <!ATTLIST GANGLIA_XML VERSION CDATA #REQUIRED>
       <!ATTLIST GANGLIA_XML SOURCE CDATA #REQUIRED>
