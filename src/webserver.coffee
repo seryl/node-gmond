@@ -36,6 +36,8 @@ class WebServer
 
     # Silence favicon requests.
     @app.get '/favicon.ico', (req, res, next) =>
-      res.json 404, "No favicon exists."
+      res.setHeader 'Content-Type', 'image/x-icon'
+      res.setHeader 'Cache-Control', 'public, max-age=864000'
+      res.end()
 
 module.exports = WebServer
