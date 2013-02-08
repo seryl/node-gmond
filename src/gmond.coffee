@@ -36,9 +36,15 @@ class Gmond
   ###
   start_udp_service: =>
     @socket.on 'message', (msg, rinfo) =>
+      console.log msg
+      console.log rinfo
       @add_metric(msg)
 
+    @socket.on 'error', (err) =>
+      console.log err
+
     @socket.bind(@config.get('gmond_udp_port'))
+    @logger.info "Started udp service #{@config.get('gmond_udp_port')}"
 
   ###*
    * Stops the udp gmond service.
@@ -98,6 +104,8 @@ class Gmond
    * @param {Object} (metric) The raw metric packet to add
   ###
   add_metric: (metric) =>
+    @logger.info "Adding metric..."
+    @logger.info metric
     msg_type = metric.readInt32BE(0)
     if (msg_type == 128) || (msg_type == 133)
       hmet = @gmetric.unpack(metric)
@@ -230,6 +238,8 @@ class Gmond
    * @return {Object} The parent node with host elements attached
   ###
   generate_host_element: (parent, hostinfo, hostname) ->
+    if hostinfo == undefined
+      return parent
     he = parent.ele('HOST')
     he.att('NAME', hostname)
     he.att('IP', hostinfo['ip'])
