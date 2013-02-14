@@ -36,8 +36,8 @@ class Gmond
   ###
   start_udp_service: =>
     @socket.on 'message', (msg, rinfo) =>
-      console.log msg
-      console.log rinfo
+      # console.log msg
+      # console.log rinfo
       @add_metric(msg)
 
     @socket.on 'error', (err) =>
@@ -104,8 +104,6 @@ class Gmond
    * @param {Object} (metric) The raw metric packet to add
   ###
   add_metric: (metric) =>
-    @logger.info "Adding metric..."
-    @logger.info metric
     msg_type = metric.readInt32BE(0)
     if (msg_type == 128) || (msg_type == 133)
       hmet = @gmetric.unpack(metric)
@@ -264,7 +262,7 @@ class Gmond
   generate_metric_element: (parent, hostinfo, metric) ->
     me = parent.ele('METRIC')
     me.att('NAME', metric.name)
-    me.att('VAL', metric.value)
+    me.att('VAL', metric.value || 0)
     me.att('TYPE', metric.type)
     me.att('UNITS', metric.units)
     me.att('TN', @unix_time() - hostinfo['reported'][metric.name])
