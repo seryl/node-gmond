@@ -4,18 +4,16 @@ Gmetric = require 'gmetric'
 builder = require 'xmlbuilder'
 async = require 'async'
 
-Logger = require './logger'
-CLI = require './cli'
-Config = require './config'
+logger = require './logger'
+cli = require './cli'
+config = require 'nconf'
 WebServer = require './webserver'
 
-###*
- * The ganglia gmond class.
+###
+The ganglia gmond class.
 ###
 class Gmond
   constructor: ->
-    @config = Config.get()
-    @logger = Logger.get()
     @gmetric = new Gmetric()
     @socket = dgram.createSocket('udp4')
 
@@ -31,53 +29,51 @@ class Gmond
     @start_udp_service()
     @start_xml_service()
 
-  ###*
-   * Starts the udp gmond service.
+  ###
+  Starts the udp gmond service.
   ###
   start_udp_service: =>
     @socket.on 'message', (msg, rinfo) =>
-      # console.log msg
-      # console.log rinfo
       @add_metric(msg)
 
     @socket.on 'error', (err) =>
-      console.log err
+      logger.error err
 
-    @socket.bind(@config.get('gmond_udp_port'))
-    @logger.info "Started udp service #{@config.get('gmond_udp_port')}"
+    @socket.bind(config.get('gmond_udp_port'))
+    logger.info "Started udp service #{config.get('gmond_udp_port')}"
 
-  ###*
-   * Stops the udp gmond service.
+  ###
+  Stops the udp gmond service.
   ###
   stop_udp_service: =>
     @socket.close()
 
-  ###*
-   * Starts up the xml service.
+  ###
+  Starts up the xml service.
   ###
   start_xml_service: =>
     @xml_server = net.createServer (sock) =>
       sock.end(@generate_xml_snapshot())
-    @xml_server.listen @config.get('gmond_tcp_port')
-      , @config.get('listen_address')
+    @xml_server.listen config.get('gmond_tcp_port')
+      , config.get('listen_address')
 
-  ###*
-   * Stops the xml service.
-   * @param {Function} (fn) The callback function
+  ###
+  Stops the xml service.
+  @param {Function} (fn) The callback function
   ###
   stop_xml_service: (fn) =>
     @xml_server.close(fn)
 
-  ###*
-   * Stops all external services.
-   * @param {Function} (fn) The callback function
+  ###
+  Stops all external services.
+  @param {Function} (fn) The callback function
   ###
   stop_services: (fn) =>
     @stop_udp_service()
     @stop_xml_service(fn)
 
-  ###*
-   * Stop all timers.
+  ###
+  Stop all timers.
   ###
   stop_timers: (fn) =>
     htimers = Object.keys(@host_timers)
@@ -92,16 +88,16 @@ class Gmond
 
     fn()
 
-  ###*
-   * Returns the current unix timestamp.
-   * @return {Integer} The unix timestamp integer
+  ###
+  Returns the current unix timestamp.
+  @return {Integer} The unix timestamp integer
   ###
   unix_time: ->
     Math.floor(new Date().getTime() / 1000)
 
-  ###*
-   * Adds a new metric automatically determining the cluster or using defaults.
-   * @param {Object} (metric) The raw metric packet to add
+  ###
+  Adds a new metric automatically determining the cluster or using defaults.
+  @param {Object} (metric) The raw metric packet to add
   ###
   add_metric: (metric) =>
     msg_type = metric.readInt32BE(0)
@@ -118,14 +114,14 @@ class Gmond
       @set_host_timer(hmet)
       @merge_metric @hosts[hmet.hostname], hmet
 
-  ###*
-   * Sets up the host DMAX timer for host cleanup.
-   * @param {Object} (hmetric) The host metric information
+  ###
+  Sets up the host DMAX timer for host cleanup.
+  @param {Object} (hmetric) The host metric information
   ###
   set_host_timer: (hmetric) =>
     @host_timers[hmetric.hostname] ||= setInterval () =>
       try
-        timeout = @hosts[hmetric.hostname].dmax || @config.get('dmax')
+        timeout = @hosts[hmetric.hostname].dmax || config.get('dmax')
         tn = @unix_time() - @hosts[hmetric.hostname]['host_reported']
         if tn > timeout
           cluster = hmetric.cluster
@@ -136,17 +132,17 @@ class Gmond
           delete @host_timers[hmetric.hostname]
       catch e
         null
-    , @config.get('cleanup_threshold')
+    , config.get('cleanup_threshold')
 
-  ###*
-   * Sets up the metric DMAX timer for metric cleanup.
-   * @param {Object} (hmetric) The host metric information
+  ###
+  Sets up the metric DMAX timer for metric cleanup.
+  @param {Object} (hmetric) The host metric information
   ###
   set_metric_timer: (hmetric) =>
     metric_key = [hmetric.hostname, hmetric.name].join('|')
     @metric_timers[metric_key] ||= setInterval () =>
       try
-        timeout = hmetric.dmax || @config.get('dmax')
+        timeout = hmetric.dmax || config.get('dmax')
         tn = @unix_time() - @hosts[hmetric.hostname]['reported'][hmetric.name]
         if tn > timeout
           if @hosts[gmetric.hostname] and @hosts[hmetric.hostname]['metrics']
@@ -155,12 +151,12 @@ class Gmond
           delete @metric_timers[metric_key]
       catch e
         null
-    , @config.get('cleanup_threshold')
+    , config.get('cleanup_threshold')
 
-  ###*
-   * Merges a metric with the hosts object.
-   * @param {Object} (target) The target hosts object to modify
-   * @param {Object} (hgmetric) The host information to merge
+  ###
+  Merges a metric with the hosts object.
+  @param {Object} (target) The target hosts object to modify
+  @param {Object} (hgmetric) The host information to merge
   ###
   merge_metric: (target, hmetric) =>
     now = @unix_time()
@@ -174,26 +170,26 @@ class Gmond
       target['metrics'][hmetric.name][key] = hmetric[key]
     target['reported'][hmetric.name] = now
 
-  ###*
-   * Returns the cluster of the metric or assumes the default.
-   * @param  {Object} (hgmetric) The host information to merge
-   * @return {String} The name of the cluster for the metric
+  ###
+  Returns the cluster of the metric or assumes the default.
+  @param  {Object} (hgmetric) The host information to merge
+  @return {String} The name of the cluster for the metric
   ###
   determine_cluster_from_metric: (hmetric) =>
-    cluster = hmetric['cluster'] || @config.get('cluster')
+    cluster = hmetric['cluster'] || config.get('cluster')
     delete hmetric['cluster']
     return cluster
 
-  ###*
-   * Generates an xml snapshot of the gmond state.
-   * @return {String} The ganglia xml snapshot pretty-printed
+  ###
+  Generates an xml snapshot of the gmond state.
+  @return {String} The ganglia xml snapshot pretty-printed
   ###
   generate_xml_snapshot: =>
     @generate_ganglia_xml().end({ pretty: true, indent: '  ', newline: "\n" })
 
-  ###*
-   * Generates the xml builder for a ganglia xml view.
-   * @return {Object} The root node of the full ganglia xml view
+  ###
+  Generates the xml builder for a ganglia xml view.
+  @return {Object} The root node of the full ganglia xml view
   ###
   generate_ganglia_xml: =>
     root = @get_gmond_xml_root()
@@ -201,21 +197,21 @@ class Gmond
       root = @generate_cluster_element(root, cluster)
     return root
 
-  ###*
-   * Appends the cluster_xml for a single cluster to the a given node.
-   * @param  {Object} (root) The root node to create the cluster element on
-   * @param  {String} (cluster) The cluster to generate elements for
-   * @return {Object} The root node with the newly attached cluster
+  ###
+  Appends the cluster_xml for a single cluster to the a given node.
+  @param  {Object} (root) The root node to create the cluster element on
+  @param  {String} (cluster) The cluster to generate elements for
+  @return {Object} The root node with the newly attached cluster
   ###
   generate_cluster_element: (root, cluster) =>
     if Object.keys(@clusters[cluster].hosts).length == 0
       delete_cluster(cluster)
     ce = root.ele('CLUSTER')
-    ce.att('NAME', cluster || @config.get('cluster'))
+    ce.att('NAME', cluster || config.get('cluster'))
     ce.att('LOCALTIME', @unix_time())
-    ce.att('OWNER', @clusters[cluster].owner || @config.get('owner'))
-    ce.att('LATLONG', @clusters[cluster].latlong || @config.get('latlong'))
-    ce.att('URL', @clusters[cluster].url || @config.get('url'))
+    ce.att('OWNER', @clusters[cluster].owner || config.get('owner'))
+    ce.att('LATLONG', @clusters[cluster].latlong || config.get('latlong'))
+    ce.att('URL', @clusters[cluster].url || config.get('url'))
 
     if @clusters[cluster] == undefined
       return root
@@ -228,12 +224,12 @@ class Gmond
       ce = @generate_host_element(ce, @hosts[h], h)
     return root
 
-  ###*
-   * Generates a host element for a given host and attaches to the parent.
-   * @param  {Object} (parent)   The parent node to append the host elem to
-   * @param  {Object} (hostinfo) The host information for the given host
-   * @param  {String} (hostname) The hostname of the current host
-   * @return {Object} The parent node with host elements attached
+  ###
+  Generates a host element for a given host and attaches to the parent.
+  @param  {Object} (parent)   The parent node to append the host elem to
+  @param  {Object} (hostinfo) The host information for the given host
+  @param  {String} (hostname) The hostname of the current host
+  @return {Object} The parent node with host elements attached
   ###
   generate_host_element: (parent, hostinfo, hostname) ->
     if hostinfo == undefined
@@ -244,20 +240,20 @@ class Gmond
     he.att('TAGS', (hostinfo['tags'] || []).join(','))
     he.att('REPORTED', hostinfo['host_reported'])
     he.att('TN', @unix_time() - hostinfo['host_reported'])
-    he.att('TMAX', hostinfo.tmax || @config.get('tmax'))
-    he.att('DMAX', hostinfo.dmax || @config.get('dmax'))
-    he.att('LOCATION', hostinfo.location || @config.get('latlong'))
+    he.att('TMAX', hostinfo.tmax || config.get('tmax'))
+    he.att('DMAX', hostinfo.dmax || config.get('dmax'))
+    he.att('LOCATION', hostinfo.location || config.get('latlong'))
     he.att('GMOND_STARTED', 0)
     for m in Object.keys(hostinfo.metrics)
       he = @generate_metric_element(he, hostinfo, hostinfo.metrics[m])
     return parent
 
-  ###*
-   * Generates the metric element and attaches to the parent.
-   * @param  {Object} (parent) The parent node to append the metric elem to
-   * @param  {Object} (host)   The host information for the given metric
-   * @param  {Object} (metric) The metric to generate metric xml from
-   * @return {Object} The parent node with metric elements attached
+  ###
+  Generates the metric element and attaches to the parent.
+  @param  {Object} (parent) The parent node to append the metric elem to
+  @param  {Object} (host)   The host information for the given metric
+  @param  {Object} (metric) The metric to generate metric xml from
+  @return {Object} The parent node with metric elements attached
   ###
   generate_metric_element: (parent, hostinfo, metric) ->
     me = parent.ele('METRIC')
@@ -266,17 +262,17 @@ class Gmond
     me.att('TYPE', metric.type)
     me.att('UNITS', metric.units)
     me.att('TN', @unix_time() - hostinfo['reported'][metric.name])
-    me.att('TMAX', metric.tmax || @config.get('tmax'))
-    me.att('DMAX', metric.dmax || @config.get('dmax'))
+    me.att('TMAX', metric.tmax || config.get('tmax'))
+    me.att('DMAX', metric.dmax || config.get('dmax'))
     me.att('SLOPE', metric.slope)
     me = @generate_extra_elements(me, metric)
     return parent
 
-  ###*
-   * Generates the extra elems for a metric and attaches to the parent.
-   * @param  {Object} (parent) The parent node to append the extra data to
-   * @param  {Object} (metric) The metric to generate extra_elements from
-   * @return {Object} The parent node with extra elements attached
+  ###
+  Generates the extra elems for a metric and attaches to the parent.
+  @param  {Object} (parent) The parent node to append the extra data to
+  @param  {Object} (metric) The metric to generate extra_elements from
+  @return {Object} The parent node with extra elements attached
   ###
   generate_extra_elements: (parent, metric) ->
     extras = @gmetric.extra_elements(metric)
@@ -290,9 +286,9 @@ class Gmond
       ee.att('VAL', metric[extra])
     return parent
 
-  ###*
-   * Returns the gmond_xml root node to build upon.
-   * @return {Object} The root gmond xmlbuilder
+  ###
+  Returns the gmond_xml root node to build upon.
+  @return {Object} The root gmond xmlbuilder
   ###
   get_gmond_xml_root: ->
     root = builder.create 'GANGLIA_XML'
