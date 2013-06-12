@@ -16,7 +16,7 @@
     "async": "0.2.9",
     "gmetric": "0.2.1",
     "xmlbuilder": "0.4.2",
-    "pkginfo": "0.2.1"
+    "pkginfo": "0.3.0"
   },
   "devDependencies": {
     "request": "2.21.0",
@@ -26,7 +26,9 @@
     "codo": "1.7.0"
   },
   "scripts": {
-    "test": "cake test"
+    "pretest": "cake build",
+    "prepublish": "cake build",
+    "test": "cake -r dot test"
   },
   "main": "./lib/gmond",
   "bin": { "node-gmond": "./bin/node-gmond" }
