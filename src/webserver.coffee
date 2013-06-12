@@ -2,28 +2,26 @@ express = require 'express'
 http = require 'http'
 require('pkginfo')(module, 'name', 'version')
 
-Config = require './config'
-Logger = require './logger'
+config = require 'nconf'
+logger = require './logger'
 
 ###*
  * The webserver class.
 ###
 class WebServer
   constructor: ->
-    @config = Config.get()
-    @logger = Logger.get()
     @app = express()
 
     @app.use express.bodyParser()
     @app.use @errorHandler
+    @app.use express.favicon()
     @setup_routing()
     @srv = http.createServer(@app)
-    @srv.listen(@config.get('port'))
-    @logger.info "Webserver is up at: http://0.0.0.0:#{@config.get('port')}"
+    @srv.listen(config.get('port'))
+    logger.info "Webserver is up at: http://0.0.0.0:#{config.get('port')}"
 
   errorHandler: (err, req, res, next) ->
-    res.status 500
-    res.render 'error', error: err
+    res.json 500, error: err
 
   # Sets up the webserver routing.
   setup_routing: =>
@@ -33,11 +31,5 @@ class WebServer
       res.json 200, 
         name: exports.name,
         version: exports.version
-
-    # Silence favicon requests.
-    @app.get '/favicon.ico', (req, res, next) =>
-      res.setHeader 'Content-Type', 'image/x-icon'
-      res.setHeader 'Cache-Control', 'public, max-age=864000'
-      res.end()
 
 module.exports = WebServer

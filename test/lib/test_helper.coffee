@@ -6,8 +6,9 @@ global.assert = chai.assert
 
 chai.should()
 
-Config = require '../../src/config'
+config = require 'nconf'
 CLI = require '../../src/cli'
 
 global.cli = new CLI()
-global.config = Config.get()
+global.config = config
+global.logger = require '../../src/logger'

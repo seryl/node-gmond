@@ -4,9 +4,9 @@ Gmetric = require 'gmetric'
 builder = require 'xmlbuilder'
 async = require 'async'
 
-Logger = require './logger'
+config = require 'nconf'
+logger = require './logger'
 CLI = require './cli'
-Config = require './config'
 WebServer = require './webserver'
 
 ###*
@@ -14,8 +14,6 @@ WebServer = require './webserver'
 ###
 class Gmond
   constructor: ->
-    @config = Config.get()
-    @logger = Logger.get()
     @gmetric = new Gmetric()
     @socket = dgram.createSocket('udp4')
 
@@ -43,8 +41,8 @@ class Gmond
     @socket.on 'error', (err) =>
       console.log err
 
-    @socket.bind(@config.get('gmond_udp_port'))
-    @logger.info "Started udp service #{@config.get('gmond_udp_port')}"
+    @socket.bind(config.get('gmond_udp_port'))
+    logger.info "Started udp service #{config.get('gmond_udp_port')}"
 
   ###*
    * Stops the udp gmond service.
@@ -58,8 +56,8 @@ class Gmond
   start_xml_service: =>
     @xml_server = net.createServer (sock) =>
       sock.end(@generate_xml_snapshot())
-    @xml_server.listen @config.get('gmond_tcp_port')
-      , @config.get('listen_address')
+    @xml_server.listen config.get('gmond_tcp_port')
+      , config.get('listen_address')
 
   ###*
    * Stops the xml service.
@@ -125,7 +123,7 @@ class Gmond
   set_host_timer: (hmetric) =>
     @host_timers[hmetric.hostname] ||= setInterval () =>
       try
-        timeout = @hosts[hmetric.hostname].dmax || @config.get('dmax')
+        timeout = @hosts[hmetric.hostname].dmax || config.get('dmax')
         tn = @unix_time() - @hosts[hmetric.hostname]['host_reported']
         if tn > timeout
           cluster = hmetric.cluster
@@ -136,7 +134,7 @@ class Gmond
           delete @host_timers[hmetric.hostname]
       catch e
         null
-    , @config.get('cleanup_threshold')
+    , config.get('cleanup_threshold')
 
   ###*
    * Sets up the metric DMAX timer for metric cleanup.
@@ -146,7 +144,7 @@ class Gmond
     metric_key = [hmetric.hostname, hmetric.name].join('|')
     @metric_timers[metric_key] ||= setInterval () =>
       try
-        timeout = hmetric.dmax || @config.get('dmax')
+        timeout = hmetric.dmax || config.get('dmax')
         tn = @unix_time() - @hosts[hmetric.hostname]['reported'][hmetric.name]
         if tn > timeout
           if @hosts[gmetric.hostname] and @hosts[hmetric.hostname]['metrics']
@@ -155,7 +153,7 @@ class Gmond
           delete @metric_timers[metric_key]
       catch e
         null
-    , @config.get('cleanup_threshold')
+    , config.get('cleanup_threshold')
 
   ###*
    * Merges a metric with the hosts object.
@@ -180,7 +178,7 @@ class Gmond
    * @return {String} The name of the cluster for the metric
   ###
   determine_cluster_from_metric: (hmetric) =>
-    cluster = hmetric['cluster'] || @config.get('cluster')
+    cluster = hmetric['cluster'] || config.get('cluster')
     delete hmetric['cluster']
     return cluster
 
@@ -211,11 +209,11 @@ class Gmond
     if Object.keys(@clusters[cluster].hosts).length == 0
       delete_cluster(cluster)
     ce = root.ele('CLUSTER')
-    ce.att('NAME', cluster || @config.get('cluster'))
+    ce.att('NAME', cluster || config.get('cluster'))
     ce.att('LOCALTIME', @unix_time())
-    ce.att('OWNER', @clusters[cluster].owner || @config.get('owner'))
-    ce.att('LATLONG', @clusters[cluster].latlong || @config.get('latlong'))
-    ce.att('URL', @clusters[cluster].url || @config.get('url'))
+    ce.att('OWNER', @clusters[cluster].owner || config.get('owner'))
+    ce.att('LATLONG', @clusters[cluster].latlong || config.get('latlong'))
+    ce.att('URL', @clusters[cluster].url || config.get('url'))
 
     if @clusters[cluster] == undefined
       return root
@@ -244,9 +242,9 @@ class Gmond
     he.att('TAGS', (hostinfo['tags'] || []).join(','))
     he.att('REPORTED', hostinfo['host_reported'])
     he.att('TN', @unix_time() - hostinfo['host_reported'])
-    he.att('TMAX', hostinfo.tmax || @config.get('tmax'))
-    he.att('DMAX', hostinfo.dmax || @config.get('dmax'))
-    he.att('LOCATION', hostinfo.location || @config.get('latlong'))
+    he.att('TMAX', hostinfo.tmax || config.get('tmax'))
+    he.att('DMAX', hostinfo.dmax || config.get('dmax'))
+    he.att('LOCATION', hostinfo.location || config.get('latlong'))
     he.att('GMOND_STARTED', 0)
     for m in Object.keys(hostinfo.metrics)
       he = @generate_metric_element(he, hostinfo, hostinfo.metrics[m])
@@ -266,8 +264,8 @@ class Gmond
     me.att('TYPE', metric.type)
     me.att('UNITS', metric.units)
     me.att('TN', @unix_time() - hostinfo['reported'][metric.name])
-    me.att('TMAX', metric.tmax || @config.get('tmax'))
-    me.att('DMAX', metric.dmax || @config.get('dmax'))
+    me.att('TMAX', metric.tmax || config.get('tmax'))
+    me.att('DMAX', metric.dmax || config.get('dmax'))
     me.att('SLOPE', metric.slope)
     me = @generate_extra_elements(me, metric)
     return parent

@@ -1,5 +1,5 @@
 dgram = require 'dgram'
-Gmond = require '../lib/gmond'
+Gmond = require '../src/gmond'
 
 Gmetric = require 'gmetric'
 async = require 'async'
@@ -10,6 +10,7 @@ describe 'Gmond', ->
   metric = {}
 
   beforeEach (done) ->
+    logger.clear()
     gmond = new Gmond()
     metric =
       hostname: 'awesomehost.mydomain.com'
@@ -25,19 +26,19 @@ describe 'Gmond', ->
 
   afterEach (done) =>
     metric = {}
-    @config.overrides({})
+    config.overrides({})
     gmond.stop_services () =>
       gmond.stop_timers () =>
         gmond = null
         done()
 
   it "should have a default cluster configuration", (done) =>
-    @config.get('dmax').should.equal 3600
-    @config.get('cleanup_threshold').should.equal 300
-    @config.get('cluster').should.equal 'main'
-    @config.get('owner').should.equal 'unspecified'
-    @config.get('latlong').should.equal 'unspecified'
-    @config.get('url').should.equal '127.0.0.1'
+    config.get('dmax').should.equal 3600
+    config.get('cleanup_threshold').should.equal 300
+    config.get('cluster').should.equal 'main'
+    config.get('owner').should.equal 'unspecified'
+    config.get('latlong').should.equal 'unspecified'
+    config.get('url').should.equal '127.0.0.1'
     done()
 
   it "should be able to add a host with proper packet ordering", (done) =>
@@ -214,10 +215,10 @@ describe 'Gmond', ->
       done()
 
     monitor = setInterval(check_complete, 5)
-    gmetric.send('127.0.0.1', @config.get('gmond_udp_port'), metric)
+    gmetric.send('127.0.0.1', config.get('gmond_udp_port'), metric)
 
   it "should be able to cleanup a host when the DMAX has expired", (done) =>
-    @config.overrides({ 'dmax': 0.1, 'cleanup_threshold': 1 })
+    config.overrides({ 'dmax': 0.1, 'cleanup_threshold': 1 })
     pmetric = gmetric.pack(metric)
     gmond.add_metric(pmetric.meta)
     gmond.add_metric(pmetric.data)
